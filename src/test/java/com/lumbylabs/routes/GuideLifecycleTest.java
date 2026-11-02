@@ -16,6 +16,9 @@ public class GuideLifecycleTest {
 
     @Before public void setup() throws Exception {
         inject("client", client);
+        inject("mapPoints", mock(net.runelite.client.ui.overlay.worldmap.WorldMapPointManager.class));
+        inject("nav", net.runelite.client.ui.NavigationButton.builder().tooltip("Guide").icon(
+            new java.awt.image.BufferedImage(16,16,java.awt.image.BufferedImage.TYPE_INT_ARGB)).build());
         SwingUtilities.invokeAndWait(() -> panel = new GuidePanel(plugin));
         inject("panel", panel);
         Player player = mock(Player.class);
@@ -24,6 +27,35 @@ public class GuideLifecycleTest {
         when(player.getWorldLocation()).thenReturn(Route.point("2549 3758 0"));
         when(client.getItemContainer(InventoryID.INVENTORY)).thenReturn(mock(ItemContainer.class));
         clearInvocations(client);
+    }
+    @Test public void hillGiantsBankedKeyIsUsableOnlyAfterWithdrawal() throws Exception {
+        Player player = client.getLocalPlayer();
+        when(player.getWorldLocation()).thenReturn(Route.point("3164 3487 0"));
+        net.runelite.api.widgets.Widget widget = mock(net.runelite.api.widgets.Widget.class);
+        int bankWidget = net.runelite.api.gameval.InterfaceID.Bankmain.ITEMS;
+        when(client.getWidget(bankWidget)).thenReturn(widget);
+        ItemContainer bank = mock(ItemContainer.class);
+        when(client.getItemContainer(InventoryID.BANK)).thenReturn(bank);
+        when(bank.count(net.runelite.api.gameval.ItemID.EDGEVILLEDUNGEONKEY)).thenReturn(1);
+        plugin.select(Route.HILL_GIANTS, true);
+        ticks(1);
+        when(client.getWidget(bankWidget)).thenReturn(null);
+        ticks(1);
+        assertTrue(panel.detail.getText().contains("trapdoor"));
+        ItemContainer bag = client.getItemContainer(InventoryID.INVENTORY);
+        when(bag.contains(net.runelite.api.gameval.ItemID.EDGEVILLEDUNGEONKEY)).thenReturn(true);
+        plugin.onItemContainerChanged(new net.runelite.api.events.ItemContainerChanged(InventoryID.INVENTORY.getId(), bag));
+        ticks(1);
+        assertTrue(panel.detail.getText().contains("shed"));
+        when(player.getWorldLocation()).thenReturn(Route.point("3094 3491 0"));
+        ticks(1);
+        assertTrue(panel.detail.getText().contains("trapdoor"));
+        when(player.getWorldLocation()).thenReturn(Route.point("3096 9867 0"));
+        ticks(1);
+        assertTrue(panel.detail.getText().contains("north"));
+        when(player.getWorldLocation()).thenReturn(Route.point("3110 9837 0"));
+        ticks(1);
+        assertTrue(panel.detail.getText().contains("reached"));
     }
     private void inject(String name, Object value) throws Exception {
         Field field = LeadTheWayPlugin.class.getDeclaredField(name);
