@@ -7,6 +7,8 @@ import java.awt.image.BufferedImage;
 import net.runelite.api.*;
 import net.runelite.api.coords.*;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.*;
@@ -21,12 +23,33 @@ public class LeadTheWayPlugin extends Plugin {
     private NavigationButton nav;
     private GuidePanel panel;
     private SceneGuide overlay;
-    volatile Route selected;
-    volatile boolean guiding;
-    volatile Route.Step step;
-    private String previous = "";
-    private static final WorldPoint PAD = Route.point("2490 10162 0"), OTHER = Route.point("2490 10164 0");
+    // Identity distinguishes two visits to the same route, including queued Swing updates.
+    static final class View {
+        final Route route;
+        final boolean active;
+        volatile Route.Step target;
+        View(Route route, boolean active) {
+            this.route = route;
+            this.active = active;
+        }
+    }
+    private volatile View view;
+    private View renderedView;
+    private Route.Step renderedStep;
+    private boolean suppliesDirty;
+    private String previousText;
+    private static final WorldPoint PAD = Route.point("2490 10162 0");
+    private static final WorldPoint OTHER = Route.point("2490 10164 0");
     private static final WorldPoint ENTRANCE = Route.point("1911 4367 0");
+    private static final Route.Step STAND_NORTH = new Route.Step(OTHER, "Stand on the northern pressure pad.");
+    private static final Route.Step STAND_SOUTH = new Route.Step(PAD, "Stand on the southern pressure pad.");
+    private static final Route.Step OPEN = new Route.Step(Route.point("2491 10163 0"), "Open the pressure door beside you.");
+    private static final Route.Step ARRIVED = new Route.Step(ENTRANCE, "Arrived at the Kings’ entrance.");
+
+    void select(Route route, boolean active) {
+        view = route == null ? null : new View(route, active);
+    }
+
     @Override protected void startUp() {
         panel = new GuidePanel(this);
         BufferedImage icon = new BufferedImage(16,16,BufferedImage.TYPE_INT_ARGB);
@@ -36,51 +59,116 @@ public class LeadTheWayPlugin extends Plugin {
         toolbar.addNavigation(nav); overlay = new SceneGuide(); overlays.add(overlay);
     }
     @Override protected void shutDown() {
-        toolbar.removeNavigation(nav); overlays.remove(overlay); selected=null; guiding=false; step=null; previous="";
+        toolbar.removeNavigation(nav); overlays.remove(overlay); select(null, false); renderedView = null;
     }
-    boolean has(int id) {
-        for (InventoryID inv : new InventoryID[]{InventoryID.INVENTORY,InventoryID.EQUIPMENT}) {
-            ItemContainer c = client.getItemContainer(inv);
-            if (c != null && c.contains(id)) return true;
+    private String supplies(Route route) {
+        ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+        ItemContainer equipment = client.getItemContainer(InventoryID.EQUIPMENT);
+        if (inventory == null) return "Waiting for inventory…";
+        StringBuilder status = new StringBuilder("<html>");
+        route.items.forEach((id, name) -> {
+            boolean packed = inventory.contains(id) || equipment != null && equipment.contains(id);
+            status.append(packed ? "✓ Packed · " : "Missing · ").append(name).append("<br>");
+        });
+        return status.append("</html>").toString();
+    }
+
+    @Subscribe public void onItemContainerChanged(ItemContainerChanged event) {
+        if (event.getContainerId() == InventoryID.INVENTORY.getId()
+            || event.getContainerId() == InventoryID.EQUIPMENT.getId()) suppliesDirty = true;
+    }
+
+    private boolean rockOnPad(WorldView world, WorldPoint pad) {
+        LocalPoint local = LocalPoint.fromWorld(world, pad);
+        if (local == null) return false;
+        Tile tile = world.getScene().getTiles()[pad.getPlane()][local.getSceneX()][local.getSceneY()];
+        if (tile == null) return false;
+        java.util.List<TileItem> items = tile.getGroundItems();
+        if (items != null) {
+            for (TileItem item : items) if (item.getId() == ItemID.VT_USELESS_ROCK) return true;
         }
         return false;
     }
-    private boolean rockOnPad() {
-        LocalPoint local = LocalPoint.fromWorld(client,PAD);
-        if(local == null) return false;
-        Tile tile = client.getScene().getTiles()[0][local.getSceneX()][local.getSceneY()];
-        return tile != null && tile.getGroundItems() != null && tile.getGroundItems().stream().anyMatch(i -> i.getId()==ItemID.VT_USELESS_ROCK);
+
+    static Route.Step padInstruction(WorldPoint player, boolean southRock, boolean northRock, Route.Step drop) {
+        if (southRock) return player.equals(OTHER) ? OPEN : STAND_NORTH;
+        if (northRock) return player.equals(PAD) ? OPEN : STAND_SOUTH;
+        return drop;
     }
+
+    private void publish(View current, String text) {
+        if (text.equals(previousText)) return;
+        previousText = text;
+        SwingUtilities.invokeLater(() -> {
+            if (view == current) panel.detail.setText(text);
+        });
+    }
+
+    @Subscribe public void onGameStateChanged(GameStateChanged event) {
+        if (event.getGameState() == GameState.LOGGED_IN) return;
+        renderedView = null;
+        View current = view;
+        if (current != null) {
+            current.target = null;
+            previousText = null;
+            publish(current, "Waiting for your character…");
+        }
+    }
+
     @Subscribe public void onGameTick(GameTick event) {
-        Route route=selected;
-        if(route==null || client.getLocalPlayer()==null) { previous=""; step=null; return; }
-        WorldPoint p=client.getLocalPlayer().getWorldLocation();
-        Route.Step next=route.at(p);
-        if(route==Route.KINGS && next.target.equals(PAD) && rockOnPad()) {
-            next=p.equals(OTHER) ? new Route.Step(OTHER,"Open the pressure door.") : new Route.Step(OTHER,"Stand on the other marked pad.");
+        View current = view;
+        if (current == null) return;
+        if (current != renderedView) {
+            renderedView = current;
+            renderedStep = null;
+            previousText = null;
+            suppliesDirty = true;
         }
-        if(route==Route.KINGS && p.distanceTo(ENTRANCE)<=2) next=new Route.Step(ENTRANCE,"Arrived at the Kings’ entrance.");
-        step=guiding ? next : null;
-        StringBuilder status=new StringBuilder("<html>");
-        for(var entry : route.items.entrySet()) status.append(has(entry.getKey()) ? "✓ Packed · " : "Missing · ").append(entry.getValue()).append("<br>");
-        String text=guiding ? "<html>"+next.text+"</html>" : status.append("</html>").toString();
-        if(!text.equals(previous)) {
-            previous=text; boolean active=guiding;
-            SwingUtilities.invokeLater(() -> { if(selected==route && active==guiding) panel.detail.setText(text); });
+        Player player = client.getLocalPlayer();
+        if (client.getGameState() != GameState.LOGGED_IN || player == null) {
+            current.target = null;
+            publish(current, "Waiting for your character…");
+            return;
+        }
+        if (!current.active) {
+            if (suppliesDirty) {
+                suppliesDirty = false;
+                publish(current, supplies(current.route));
+            }
+            return;
+        }
+        WorldPoint location = player.getWorldLocation();
+        Route.Step next = current.route.at(location);
+        if (current.route == Route.KINGS && next.target.equals(PAD)) {
+            WorldView world = player.getWorldView();
+            boolean southRock = rockOnPad(world, PAD);
+            next = padInstruction(location, southRock, !southRock && rockOnPad(world, OTHER), next);
+        }
+        if (current.route == Route.KINGS && location.distanceTo(ENTRANCE) <= 2) next = ARRIVED;
+        if (view != current) return;
+        current.target = next;
+        if (next != renderedStep) {
+            renderedStep = next;
+            publish(current, "<html><body width='145'>" + next.text + "</body></html>");
         }
     }
+    private static final Color BACKGROUND = new Color(24,24,24,222);
     private final class SceneGuide extends Overlay {
         SceneGuide() { setPosition(OverlayPosition.DYNAMIC); setLayer(OverlayLayer.ABOVE_SCENE); }
         public Dimension render(Graphics2D g) {
-            Route.Step s=step;
-            if(!guiding || s==null || client.getGameState()!=GameState.LOGGED_IN) return null;
-            LocalPoint l=LocalPoint.fromWorld(client,s.target);
-            if(l!=null && client.getPlane()==s.target.getPlane()) {
+            View current = view;
+            if (current == null || !current.active || client.getGameState() != GameState.LOGGED_IN) return null;
+            Route.Step s = current.target;
+            if (s == null) return null;
+            WorldView world = client.getTopLevelWorldView();
+            if (world == null) return null;
+            LocalPoint l=LocalPoint.fromWorld(world,s.target);
+            if(l!=null) {
                 Polygon tile=Perspective.getCanvasTilePoly(client,l);
                 if(tile!=null) OverlayUtil.renderPolygon(g,tile,Color.CYAN);
             }
             int x=client.getViewportXOffset()+12,y=client.getViewportYOffset()+18;
-            g.setColor(new Color(24,24,24,222)); g.fillRect(x,y,g.getFontMetrics().stringWidth(s.text)+18,27);
+            g.setColor(BACKGROUND); g.fillRect(x,y,g.getFontMetrics().stringWidth(s.text)+18,27);
             g.setColor(Color.WHITE); g.drawString(s.text,x+9,y+18); return null;
         }
     }

@@ -6,6 +6,7 @@ repositories {
 dependencies {
     compileOnly 'net.runelite:client:latest.release'
     testImplementation 'net.runelite:client:latest.release'
+    testImplementation 'org.mockito:mockito-core:4.11.0'
     testImplementation 'junit:junit:4.13.2'
 }
 tasks.withType(JavaCompile).configureEach { options.release.set(11) }

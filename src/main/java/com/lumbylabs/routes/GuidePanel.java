@@ -21,7 +21,7 @@ final class GuidePanel extends PluginPanel {
         body.add(new JLabel("by Lumby Labs")); body.add(Box.createVerticalStrut(16));
     }
     private void catalog() {
-        plugin.guiding=false; plugin.selected=null; plugin.step=null; header();
+        plugin.select(null, false); header();
         body.add(new JLabel("Find a destination")); JTextField search=new JTextField(); body.add(search);
         JPanel results=new JPanel(); results.setLayout(new BoxLayout(results,BoxLayout.Y_AXIS)); body.add(results);
         Runnable filter=()->{
@@ -39,10 +39,10 @@ final class GuidePanel extends PluginPanel {
         }); filter.run(); revalidate(); repaint();
     }
     private void preview(Route r) {
-        plugin.selected=r; header(); body.add(new JLabel(r.name)); body.add(Box.createVerticalStrut(8));
+        plugin.select(r, false); header(); body.add(new JLabel(r.name)); body.add(Box.createVerticalStrut(8));
         JLabel caption=new JLabel(r.items.isEmpty()?"Route preview":"What to bring"); body.add(caption);
-        detail.setText("Checking supplies…"); body.add(detail); JButton start=new JButton("Guide me"); body.add(start);
-        start.addActionListener(e->{plugin.guiding=true; caption.setText("Next step"); detail.setText("Finding your stage…"); start.setVisible(false);});
+        detail.setText("Waiting for inventory…"); body.add(detail); JButton start=new JButton("Guide me"); body.add(start);
+        start.addActionListener(e->{plugin.select(r, true); caption.setText("Next step"); detail.setText("Finding your stage…"); start.setVisible(false);});
         JButton back=new JButton("Close route"); back.addActionListener(e->catalog()); body.add(back); revalidate(); repaint();
     }
 }
