@@ -57,6 +57,88 @@ public class GuideLifecycleTest {
         ticks(1);
         assertTrue(panel.detail.getText().contains("reached"));
     }
+    @Test public void detailedKingsInstructionsFitTheCanvasBanner() throws Exception {
+        Class<?> type = Class.forName(LeadTheWayPlugin.class.getName() + "$InstructionBanner");
+        java.lang.reflect.Constructor<?> constructor = type.getDeclaredConstructor(LeadTheWayPlugin.class);
+        constructor.setAccessible(true);
+        net.runelite.client.ui.overlay.Overlay banner =
+            (net.runelite.client.ui.overlay.Overlay) constructor.newInstance(plugin);
+        inject("showBanner", true);
+        LeadTheWayPlugin.View view = new LeadTheWayPlugin.View(Route.KINGS, true);
+        inject("view", view);
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+            800, 600, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = image.createGraphics();
+        try {
+            for (int canvasWidth : new int[]{240, 765}) {
+                when(client.getCanvasWidth()).thenReturn(canvasWidth);
+                for (Route.Stage stage : Route.KINGS.stages) {
+                    view.target = stage.next;
+                    java.awt.Dimension size = banner.render(g);
+                    assertTrue(stage.milestone, size.width <= canvasWidth - 18);
+                    assertTrue(stage.milestone, size.height <= image.getHeight());
+                    if (stage.milestone.equals("Open the pressure door")) {
+                        assertTrue("Detailed instructions must wrap", size.height > g.getFontMetrics().getHeight() + 10);
+                    }
+                }
+            }
+        } finally { g.dispose(); }
+    }
+    @Test public void livePadCueUpdatesFromSceneAndClearsOnBankLogoutAndEnd() throws Exception {
+        WorldView world = mock(WorldView.class);
+        Scene scene = mock(Scene.class);
+        when(world.getScene()).thenReturn(scene);
+        when(world.getBaseX()).thenReturn(2432);
+        when(world.getBaseY()).thenReturn(10112);
+        when(world.getSizeX()).thenReturn(104);
+        when(world.getSizeY()).thenReturn(104);
+        Tile[][][] tiles = new Tile[4][104][104];
+        when(scene.getTiles()).thenReturn(tiles);
+        Player player = client.getLocalPlayer();
+        when(player.getWorldView()).thenReturn(world);
+        when(player.getWorldLocation()).thenReturn(KingsGuide.SOUTH);
+        ItemContainer bag = client.getItemContainer(InventoryID.INVENTORY);
+        when(bag.contains(net.runelite.api.gameval.ItemID.VT_USELESS_ROCK)).thenReturn(true);
+        plugin.select(Route.KINGS, true);
+        ticks(1);
+        assertSame(KingsGuide.DROP, plugin.interactionStep());
+        Tile pad = mock(Tile.class);
+        TileItem rock = mock(TileItem.class);
+        when(rock.getId()).thenReturn(net.runelite.api.gameval.ItemID.VT_USELESS_ROCK);
+        when(pad.getGroundItems()).thenReturn(java.util.List.of(rock));
+        tiles[0][58][50] = pad;
+        when(bag.contains(net.runelite.api.gameval.ItemID.VT_USELESS_ROCK)).thenReturn(false);
+        ticks(1);
+        assertSame(KingsGuide.STAND_NORTH, plugin.interactionStep());
+        when(player.getWorldLocation()).thenReturn(KingsGuide.NORTH);
+        ticks(1);
+        assertSame(KingsGuide.OPEN, plugin.interactionStep());
+        Tile door = mock(Tile.class);
+        WallObject object = mock(WallObject.class);
+        when(object.getId()).thenReturn(net.runelite.api.gameval.ObjectID.DAGANNOTH_PRESSURE_OPEN);
+        when(door.getWallObject()).thenReturn(object);
+        tiles[0][59][51] = door;
+        ticks(1);
+        assertSame(KingsGuide.TAKE_SOUTH, plugin.interactionStep());
+        when(pad.getGroundItems()).thenReturn(java.util.List.of());
+        when(bag.contains(net.runelite.api.gameval.ItemID.VT_USELESS_ROCK)).thenReturn(true);
+        ticks(1);
+        assertSame(KingsGuide.CROSS, plugin.interactionStep());
+        net.runelite.api.widgets.Widget bank = mock(net.runelite.api.widgets.Widget.class);
+        when(client.getWidget(net.runelite.api.gameval.InterfaceID.Bankmain.ITEMS)).thenReturn(bank);
+        ticks(1);
+        assertNull(plugin.interactionStep());
+        when(client.getWidget(net.runelite.api.gameval.InterfaceID.Bankmain.ITEMS)).thenReturn(null);
+        ticks(1);
+        assertSame(KingsGuide.CROSS, plugin.interactionStep());
+        when(client.getGameState()).thenReturn(GameState.LOGIN_SCREEN);
+        ticks(1);
+        assertNull(plugin.interactionStep());
+        when(client.getGameState()).thenReturn(GameState.LOGGED_IN);
+        plugin.select(null, false);
+        assertNull(plugin.interactionStep());
+    }
+
     private void inject(String name, Object value) throws Exception {
         Field field = LeadTheWayPlugin.class.getDeclaredField(name);
         field.setAccessible(true);

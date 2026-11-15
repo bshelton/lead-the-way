@@ -19,10 +19,13 @@ final class Route {
     static final class Stage {
         final WorldPoint a, b;
         final String milestone;
+        final net.runelite.api.Prayer prayer, nextPrayer;
         final Step next;
         Stage(String line) {
             String[] fields = line.split("[|]", -1);
             milestone = fields.length > 4 ? fields[4] : fields[3];
+            prayer = fields.length > 5 && !fields[5].isEmpty() ? net.runelite.api.Prayer.valueOf(fields[5]) : null;
+            nextPrayer = fields.length > 6 && !fields[6].isEmpty() ? net.runelite.api.Prayer.valueOf(fields[6]) : null;
             a = point(fields[0]); b = point(fields[1]);
             next = new Step(point(fields[2]), fields[3]);
         }

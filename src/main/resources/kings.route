@@ -1,18 +1,18 @@
-2499 3770 0|2557 3713 0|2521 3740 0|Enter the cave on Waterbirth Island.|Enter the island cave
-2434 10174 0|2491 10118 0|2490 10162 0|Drop your pet rock on the marked pressure pad.|Open the pressure door
-2492 10174 0|2558 10149 0|2545 10146 0|Follow the northern passage to the barrier.|Reach the barricade
-2544 10148 0|2546 10146 0|2543 10143 0|Use the rune thrownaxe special attack on the middle support.|Break the support
-2542 10145 0|2547 10141 0|2546 10143 0|Climb down the marked ladder.|Take ladder 1
-1792 4414 3|1809 4397 3|1808 4405 3|Take the marked ladder.|Take ladder 2
-1808 4411 2|1824 4400 2|1823 4404 2|Take the marked ladder.|Take ladder 3
-1824 4412 3|1853 4389 3|1834 4389 3|Take the marked ladder.|Take ladder 4
-1807 4397 2|1835 4380 2|1811 4394 2|Take the marked ladder.|Take ladder 5
-1794 4398 1|1815 4387 1|1799 4388 1|Take the marked ladder.|Take ladder 6
-1793 4387 2|1805 4378 2|1797 4382 2|Take the marked ladder.|Take ladder 7
-1793 4385 1|1807 4365 1|1802 4369 1|Take the marked ladder.|Take ladder 8
-1796 4374 2|1877 4354 2|1826 4362 2|Take the marked ladder.|Take ladder 9
-1824 4374 1|1872 4353 1|1863 4371 1|Take the marked ladder.|Take ladder 10
-1856 4389 2|1871 4371 2|1864 4388 2|Take the marked ladder.|Take ladder 11
-1858 4415 1|1896 4387 1|1890 4407 1|Take the marked ladder.|Take ladder 12
-1874 4415 0|1968 4350 0|1911 4367 0|Follow the passage to the Kings’ entrance.|Reach the Kings’ entrance
-2891 4472 0|2936 4362 0|1911 4367 0|Arrived in the Kings’ lair.|
+2499 3770 0|2557 3713 0|2521 3740 0|Enter the cave on Waterbirth Island with Protect from Melee on.|Enter the island cave||PROTECT_FROM_MELEE
+2434 10174 0|2491 10118 0|2490 10162 0|Keep Protect from Melee on. Stand on the marked pad and drop your pet rock. Walk onto the other pad beside the northern door, then open the door. Pick up your rock before walking through the open door.|Open the pressure door|PROTECT_FROM_MELEE|
+2492 10174 0|2558 10149 0|2545 10146 0|Keep Protect from Melee on past the giant rock crabs. Follow the northern passage east, then south to the barrier.|Reach the barricade|PROTECT_FROM_MELEE|
+2544 10148 0|2546 10146 0|2543 10143 0|Wield a rune thrownaxe. Turn on its special attack, then attack the western (middle) door-support at the marker. The axe bounces to break the supports. Go through promptly and re-equip your combat weapon.|Break the support|PROTECT_FROM_MELEE|
+2542 10145 0|2547 10141 0|2546 10143 0|Turn on Protect from Magic before climbing DOWN ladder 1.|Take ladder 1|PROTECT_FROM_MAGIC|
+1792 4414 3|1809 4397 3|1808 4405 3|Protect from Magic here. Go east to ladder 2; switch to Protect from Missiles just before climbing down.|Take ladder 2|PROTECT_FROM_MAGIC|PROTECT_FROM_MISSILES
+1808 4411 2|1824 4400 2|1823 4404 2|Protect from Missiles here. Run east to ladder 3; switch to Protect from Melee just before climbing up.|Take ladder 3|PROTECT_FROM_MISSILES|PROTECT_FROM_MELEE
+1824 4412 3|1853 4389 3|1834 4389 3|Protect from Melee here. Pass the giant rock crabs and head south to ladder 4; switch to Protect from Missiles just before climbing down.|Take ladder 4|PROTECT_FROM_MELEE|PROTECT_FROM_MISSILES
+1807 4397 2|1835 4380 2|1811 4394 2|Protect from Missiles here. Run to the WEST ladder (5), not the southern ladder to Bardur. Switch to Protect from Magic just before climbing down.|Take ladder 5|PROTECT_FROM_MISSILES|PROTECT_FROM_MAGIC
+1794 4398 1|1815 4387 1|1799 4388 1|Protect from Magic here. Head southwest to ladder 6 and climb up; keep this prayer on.|Take ladder 6|PROTECT_FROM_MAGIC|
+1793 4387 2|1805 4378 2|1797 4382 2|Protect from Magic here. Take ladder 7 down; keep this prayer on.|Take ladder 7|PROTECT_FROM_MAGIC|
+1793 4385 1|1807 4365 1|1802 4369 1|Protect from Magic here. Head south to ladder 8; switch to Protect from Melee just before climbing up.|Take ladder 8|PROTECT_FROM_MAGIC|PROTECT_FROM_MELEE
+1796 4374 2|1877 4354 2|1826 4362 2|Protect from Melee here. Pass the giant rock crabs to ladder 9; switch to Protect from Missiles just before climbing down.|Take ladder 9|PROTECT_FROM_MELEE|PROTECT_FROM_MISSILES
+1824 4374 1|1872 4353 1|1863 4371 1|Protect from Missiles here. Run east, then north to ladder 10 and climb up; keep this prayer on.|Take ladder 10|PROTECT_FROM_MISSILES|
+1856 4389 2|1871 4371 2|1864 4388 2|Protect from Missiles here. Go north to ladder 11; switch to Protect from Melee just before climbing down.|Take ladder 11|PROTECT_FROM_MISSILES|PROTECT_FROM_MELEE
+1858 4415 1|1896 4387 1|1890 4407 1|Protect from Melee here. Follow the corridor north, then east to ladder 12 and climb down; keep this prayer on for the rock lobsters.|Take ladder 12|PROTECT_FROM_MELEE|
+1874 4415 0|1968 4350 0|1911 4367 0|Protect from Melee past the rock lobsters. Follow the corridor east, then southwest. Switch to Protect from Magic as you approach the wallasalkis, and keep it on before descending into the Kings’ lair.|Reach the Kings’ entrance|PROTECT_FROM_MELEE|
+2891 4472 0|2936 4362 0|1911 4367 0|Arrived in the Kings’ lair.|||

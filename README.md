@@ -6,7 +6,7 @@ Choose a destination and follow one instruction at a time. Lead the Way marks th
 
 1. Open the **signpost** sidebar and search for **Hill Giants** or **Dagannoth Kings**.
 2. Select the destination to see its length, requirements and steps. Open your bank to see what to withdraw for the suggested route.
-3. Click **Guide me**. Follow the cyan minimap cue and the gold current step. The guide advances as you reach each area.
+3. Click **Guide me**. Follow the cyan minimap cue and the gold current step. The guide advances as you reach each area. On the Kings route, gold highlights identify the pet rock or thrownaxe in your inventory, the special attack control, and the prayer to activate. Cyan ground labels and outlines identify the pads, dropped rock, door, support and ladders.
 4. Choose **End route** to clear the guide and its markers.
 
 <img src="docs/screenshots/hill-guide.png" alt="Hill Giants guide with the trapdoor step highlighted and later corridor steps underneath" width="225"> <img src="docs/screenshots/bank.png" alt="Dagannoth Kings ferry checklist showing a coin withdrawal and packed or missing supplies" width="225">

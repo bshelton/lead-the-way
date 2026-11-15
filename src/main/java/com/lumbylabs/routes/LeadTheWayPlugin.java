@@ -54,11 +54,14 @@ public class LeadTheWayPlugin extends Plugin {
     private GuidePanel panel;
     private SceneGuide overlay;
     private InstructionBanner banner;
+    private InventoryGuide inventoryGuide;
+    private InteractionOverlay interactionOverlay;
     // Identity distinguishes two visits to the same route, including queued Swing updates.
     static final class View {
         final Route route;
         final boolean active;
         volatile Route.Step target;
+        volatile Prayer prayer;
         View(Route route, boolean active) {
             this.route = route;
             this.active = active;
@@ -72,14 +75,6 @@ public class LeadTheWayPlugin extends Plugin {
     private boolean showingBankPlan;
     private java.util.List<String> previousUpcoming = java.util.List.of();
     private String previousText;
-    private static final WorldPoint PAD = Route.point("2490 10162 0");
-    private static final WorldPoint OTHER = Route.point("2490 10164 0");
-    private static final WorldPoint ENTRANCE = Route.point("1911 4367 0");
-    private static final Route.Step STAND_NORTH = new Route.Step(OTHER, "Stand on the northern pressure pad.");
-    private static final Route.Step STAND_SOUTH = new Route.Step(PAD, "Stand on the southern pressure pad.");
-    private static final Route.Step OPEN = new Route.Step(Route.point("2491 10163 0"), "Open the pressure door beside you.");
-    private static final Route.Step ARRIVED = new Route.Step(ENTRANCE, "Arrived at the Kings’ entrance.");
-
     private synchronized void mark(View owner, Route.Step step) {
         if (owner != view) return;
         if (marker != null) {
@@ -111,9 +106,12 @@ public class LeadTheWayPlugin extends Plugin {
         banner = new InstructionBanner();
         overlays.add(banner);
         miniGuide = new MiniGuide(); overlays.add(miniGuide);
+        inventoryGuide = new InventoryGuide(); overlays.add(inventoryGuide);
+        interactionOverlay = new InteractionOverlay(client, this::interactionStep, () -> view == null ? null : view.prayer);
+        overlays.add(interactionOverlay);
     }
     @Override protected void shutDown() {
-        toolbar.removeNavigation(nav); overlays.remove(overlay); overlays.remove(banner); overlays.remove(miniGuide); select(null, false); renderedView = null;
+        toolbar.removeNavigation(nav); overlays.remove(overlay); overlays.remove(banner); overlays.remove(miniGuide); overlays.remove(inventoryGuide); overlays.remove(interactionOverlay); select(null, false); renderedView = null;
     }
     private String supplies(View current, WorldPoint location) {
         ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
@@ -211,22 +209,25 @@ public class LeadTheWayPlugin extends Plugin {
         return contains(c, ItemID.DRAMEN_STAFF) || contains(c, ItemID.LUNAR_MOONCLAN_LIMINAL_STAFF);
     }
 
-    private boolean rockOnPad(WorldView world, WorldPoint pad) {
-        LocalPoint local = LocalPoint.fromWorld(world, pad);
-        if (local == null) return false;
-        Tile tile = world.getScene().getTiles()[pad.getPlane()][local.getSceneX()][local.getSceneY()];
-        if (tile == null) return false;
-        java.util.List<TileItem> items = tile.getGroundItems();
-        if (items != null) {
-            for (TileItem item : items) if (item.getId() == ItemID.VT_USELESS_ROCK) return true;
-        }
-        return false;
+    static Route.Step padInstruction(WorldPoint player, boolean southRock, boolean northRock, Route.Step drop) {
+        return southRock || northRock ? KingsGuide.pressure(player, southRock, northRock, false, false) : drop;
     }
 
-    static Route.Step padInstruction(WorldPoint player, boolean southRock, boolean northRock, Route.Step drop) {
-        if (southRock) return player.equals(OTHER) ? OPEN : STAND_NORTH;
-        if (northRock) return player.equals(PAD) ? OPEN : STAND_SOUTH;
-        return drop;
+    Route.Step interactionStep() {
+        View current = view;
+        return current != null && current.active && current.route == Route.KINGS && !bankOpen
+            && client.getGameState() == GameState.LOGGED_IN ? current.target : null;
+    }
+
+    private final class InventoryGuide extends WidgetItemOverlay {
+        InventoryGuide() { showOnInterfaces(InterfaceID.INVENTORY); }
+        @Override public void renderItemOverlay(Graphics2D graphics, int itemId, net.runelite.api.widgets.WidgetItem item) {
+            Route.Step current = interactionStep();
+            if (current == null || KingsGuide.inventoryItem(current) != itemId) return;
+            Graphics2D g = (Graphics2D) graphics.create();
+            try { InteractionOverlay.highlight(g, item.getCanvasBounds(), current == KingsGuide.DROP ? "Drop" : "Wield"); }
+            finally { g.dispose(); }
+        }
     }
 
     private void publish(View current, String text) {
@@ -321,20 +322,22 @@ public class LeadTheWayPlugin extends Plugin {
             next = stage == current.route.start ? HillGiants.surface(location, hillKeyCarried) : HillGiants.dungeon(stage, hillKeyCarried);
         }
         if (current.route == Route.KINGS && next == current.route.start) next = approach(location, next);
-        if (current.route == Route.KINGS && PAD.equals(next.target)) {
-            WorldView world = player.getWorldView();
-            boolean southRock = rockOnPad(world, PAD);
-            next = padInstruction(location, southRock, !southRock && rockOnPad(world, OTHER), next);
+        if (current.route == Route.KINGS) {
+            current.prayer = null;
+            for (Route.Stage room : current.route.stages) {
+                if (room.next == stage) { current.prayer = KingsGuide.prayer(room, location); break; }
+            }
+            next = KingsGuide.resolve(client, player.getWorldView(), location, next);
+            if (next == KingsGuide.PASS_SUPPORT) current.prayer = Prayer.PROTECT_FROM_MAGIC;
+            // Keep the entrance prayer and ladder marker visible until the player enters the lair.
         }
-        if (current.route == Route.KINGS && location.distanceTo(ENTRANCE) <= 2) next = ARRIVED;
         if (view != current) return;
         current.target = next;
         if (next != renderedStep) {
             renderedStep = next;
             mark(current, next);
             publish(current, "<html><body width='124'>" + next.text + "</body></html>",
-                next == ARRIVED ? java.util.List.of()
-                    : next == HillGiants.SHED_WALK ? java.util.List.of("Climb down in the shed", "Enter the giant chamber")
+                next == HillGiants.SHED_WALK ? java.util.List.of("Climb down in the shed", "Enter the giant chamber")
                     : next == HillGiants.SHED_DOOR ? java.util.List.of("Enter the giant chamber")
                     : next == HillGiants.PICKUP ? current.route.upcoming(stage, java.util.List.of(), true)
                     : next == HillGiants.EDGEVILLE ? HillGiants.list(HillGiants.trapdoorSteps(), hillKeyCarried)
@@ -407,6 +410,31 @@ public class LeadTheWayPlugin extends Plugin {
             if(l!=null) {
                 Polygon tile=Perspective.getCanvasTilePoly(client,l);
                 if(tile!=null) OverlayUtil.renderPolygon(g,tile,Color.CYAN);
+                if (current.route == Route.KINGS) {
+                    String label = s == KingsGuide.DROP ? "Drop pet rock here"
+                        : s == KingsGuide.TAKE_SOUTH || s == KingsGuide.TAKE_NORTH ? "Take pet rock"
+                        : s == KingsGuide.WALK_PAD || s == KingsGuide.STAND_NORTH || s == KingsGuide.STAND_SOUTH ? "Stand here"
+                        : s == KingsGuide.OPEN ? "Open door"
+                        : s == KingsGuide.ATTACK ? "Attack (special)" : "Next step";
+                    net.runelite.api.Point text = Perspective.getCanvasTextLocation(client, g, l, label, 30);
+                    if (text != null) OverlayUtil.renderTextLocation(g, text, label, Color.CYAN);
+                    if (s == KingsGuide.ATTACK) {
+                        for (NPC npc : world.npcs()) {
+                            if (npc.getId() == net.runelite.api.gameval.NpcID.DAGANNOTH_WEAK_DOOR_WEST) {
+                                Shape hull = npc.getConvexHull();
+                                if (hull != null) { g.setColor(Color.CYAN); g.draw(hull); }
+                            }
+                        }
+                    } else {
+                        for (TileObject object : KingsGuide.objects(KingsGuide.tile(world, s.target))) {
+                            Shape hull = object instanceof GameObject ? ((GameObject) object).getConvexHull()
+                                : object instanceof WallObject ? ((WallObject) object).getConvexHull()
+                                : object instanceof GroundObject ? ((GroundObject) object).getConvexHull()
+                                : object instanceof DecorativeObject ? ((DecorativeObject) object).getConvexHull() : null;
+                            if (hull != null) { g.setColor(Color.CYAN); g.draw(hull); }
+                        }
+                    }
+                }
             }
             return null;
         }
@@ -428,12 +456,28 @@ public class LeadTheWayPlugin extends Plugin {
             if (instruction == null) return null;
 
             FontMetrics font = g.getFontMetrics();
-            int width = font.stringWidth(instruction.text) + 18;
-            int height = font.getHeight() + 10;
+            int textWidth = Math.min(360, Math.max(100, client.getCanvasWidth() - 36));
+            java.text.AttributedString text = new java.text.AttributedString(instruction.text);
+            text.addAttribute(java.awt.font.TextAttribute.FONT, g.getFont());
+            java.awt.font.LineBreakMeasurer measurer = new java.awt.font.LineBreakMeasurer(
+                text.getIterator(), g.getFontRenderContext());
+            java.util.List<java.awt.font.TextLayout> lines = new java.util.ArrayList<>();
+            float widest = 0;
+            while (measurer.getPosition() < instruction.text.length()) {
+                java.awt.font.TextLayout line = measurer.nextLayout(textWidth);
+                lines.add(line);
+                widest = Math.max(widest, line.getVisibleAdvance());
+            }
+            int width = (int) Math.ceil(widest) + 18;
+            int height = font.getHeight() * lines.size() + 10;
             g.setColor(BACKGROUND);
             g.fillRect(0, 0, width, height);
             g.setColor(Color.WHITE);
-            g.drawString(instruction.text, 9, 5 + font.getAscent());
+            int baseline = 5 + font.getAscent();
+            for (java.awt.font.TextLayout line : lines) {
+                line.draw(g, 9, baseline);
+                baseline += font.getHeight();
+            }
             return new Dimension(width, height);
         }
     }
